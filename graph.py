@@ -1,6 +1,12 @@
-from functools import wraps
 from typing import Dict
+from functools import wraps
 import numbers
+
+class NodeClassError(Exception):
+    pass
+
+# Weird cyclic dependence
+# NumericOperators depends on all operations and Const AND is baseclass for all nodes
 
 def numbers_to_const(func):
     """Decorator that wraps numbers.Number types from *args in Constant""" 
@@ -14,39 +20,8 @@ def numbers_to_const(func):
         return func(*non_numbers, *numbers, **kwargs)
     return wrapper
 
-class EvaluationError(Exception):
-    pass
-
-class NodeClassError(Exception):
-    pass
-
-class Node:
-    """Basic block of the computational graph"""
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if not hasattr(cls, 'evaluate'):
-            raise NodeClassError(f"Class '{cls.__name__}' doesn’t have an 'evaluate' mehtod")
-        setattr(cls, 'evaluate', Node.wrap_evaluate(cls.evaluate))
-    
-    @staticmethod
-    def wrap_evaluate(method):
-        @wraps(method)
-        def wrapper(cls, *args, **kwargs):
-            # Either context alone
-            if len(args) > 1:
-                raise TypeError(f"{method.__name__}() takes 1 positional argument but {len(args)} were given")
-            # Or keywords argument alone
-            if args and kwargs:
-                raise TypeError(f"{method.__name__}() takes 1 positional argument (context) or keywords arguments, not both. {len(args)} positional arguments and {len(kwargs.keys())} keywords arguments were given")
-            # Context
-            if len(args) == 1:
-                res =  method(cls, *args)
-            else:
-                # keywords
-                res = method(cls, kwargs)
-            return res
-        return wrapper
-
+class NumericOperators:
+    """Class/interface implementing all the methods to emulate numeric types of python"""
     @numbers_to_const
     def __add__(self, right):
         return Add(self, right)
@@ -79,14 +54,56 @@ class Node:
     def __rtruediv__(self, left):
         return Div(left, self)
 
-    
     def __neg__(self):
         return Neg(self)
+
+class Node(NumericOperators):
+    """Basic block of the computational graph"""
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not hasattr(cls, 'evaluate'):
+            raise NodeClassError(f"Class '{cls.__name__}' doesn’t have an 'evaluate' mehtod")
+        setattr(cls, 'evaluate', Node.wrap_evaluate(cls.evaluate))
     
+    @staticmethod
+    def wrap_evaluate(method):
+        @wraps(method)
+        def wrapper(cls, *args, **kwargs):
+            # Either context alone
+            if len(args) > 1:
+                raise TypeError(f"{method.__name__}() takes 1 positional argument but {len(args)} were given")
+            # Or keywords argument alone
+            if args and kwargs:
+                raise TypeError(f"{method.__name__}() takes 1 positional argument (context) or keywords arguments, not both. {len(args)} positional arguments and {len(kwargs.keys())} keywords arguments were given")
+            # Context
+            if len(args) == 1:
+                res =  method(cls, *args)
+            else:
+                # keywords
+                res = method(cls, kwargs)
+            return res
+        return wrapper
+
     def evaluate(self, context):
         return NotImplemented("Node cannot be evaluated needs to be subclassed")
 
+
+class Constant(Node):
+    """Constant, has a constant value set at instantiation"""
+    def __init__(self, value):
+        self.value = value
+
+    def evaluate(self, context):
+        return self.value
+
+    def __repr__(self):
+        return f"Constant({self.value!r})"
+
+class EvaluationError(Exception):
+    pass
+
 class Variable(Node):
+    """Variable, can be given a value at evaluation"""
     def __init__(self, name: str=None):
         self.name = name
 
@@ -104,25 +121,13 @@ class Variable(Node):
                 return self
         return context["variables"][self]
 
-class Constant(Node):
-    def __init__(self, value):
-        self.value = value
-
-    def evaluate(self, context):
-        return self.value
-
-    def __repr__(self):
-        return f"Constant({self.value!r})"
-
 class Operation(Node):
-    """ Operation """
+    """Base class for all operations"""
     def __init__(self, *args, **kwargs):
         self.args = args
 
     def evaluate(self, context):
         return NotImplemented("Operation cannot be evaluated needs to be subclassed")
-
-
 
 class Add(Operation):
     def __init__(self, left, right):
@@ -178,6 +183,7 @@ class Neg(Operation):
 
     def evaluate(self, context):
         return -self.arg.evaluate(context)
+
 
 if __name__ == "__main__":
     x = Variable("x")
