@@ -7,6 +7,7 @@ class NodeClassError(Exception):
 
 # Weird cyclic dependence
 # NumericOperators depends on all operations and Const AND is baseclass for all nodes
+# Fixes : rethink architecture, monkey patch
 
 def numbers_to_const(func):
     """Decorator that wraps numbers.Number types from *args in Constant""" 
@@ -39,6 +40,10 @@ class NumericOperators:
         return Div(self, right)
 
     @numbers_to_const
+    def __pow__(self, left):
+        return Pow(self, left)
+
+    @numbers_to_const
     def __radd__(self, left):
         return Add(left, self)
 
@@ -53,6 +58,10 @@ class NumericOperators:
     @numbers_to_const
     def __rtruediv__(self, left):
         return Div(left, self)
+
+    @numbers_to_const
+    def __rpow__(self, left):
+        return Pow(left, self)
 
     def __neg__(self):
         return Neg(self)
@@ -85,7 +94,7 @@ class Node(NumericOperators):
         return wrapper
 
     def evaluate(self, context):
-        return NotImplemented("Node cannot be evaluated needs to be subclassed")
+        raise NotImplementedError
 
 
 class Constant(Node):
@@ -98,6 +107,9 @@ class Constant(Node):
 
     def __repr__(self):
         return f"Constant({self.value!r})"
+
+    def derivate(self, var):
+        return 0
 
 class EvaluationError(Exception):
     pass
@@ -113,13 +125,26 @@ class Variable(Node):
     def evaluate(self, context: Dict=None):
         if not context:
             raise EvaluationError(f"Can’t evaluate {self!r} without context")
+        
+        simplification = context.get("simplification", False)
+        if "variables" not in context:
+            if not simplification:
+                raise EvaluationError(f"Can’t evaluate {self!r}, variables not found")
+            else:
+                return self
+    
         if self not in context["variables"]:
-            simplification = context.get("simplification", False)
             if not simplification:
                 raise EvaluationError(f"Can’t evaluate {self!r}, value not found")
             else:
                 return self
         return context["variables"][self]
+
+    def derivate(self, var):
+        if var is self:
+            return 1
+        else:
+            return 0
 
 class Operation(Node):
     """Base class for all operations"""
@@ -127,7 +152,7 @@ class Operation(Node):
         self.args = args
 
     def evaluate(self, context):
-        return NotImplemented("Operation cannot be evaluated needs to be subclassed")
+        raise NotImplementedError
 
 class Add(Operation):
     def __init__(self, left, right):
@@ -140,6 +165,9 @@ class Add(Operation):
     def evaluate(self, context: Dict=None):
         """ Evalute and return the result of the operation """
         return self.left.evaluate(context) + self.right.evaluate(context)
+    
+    def derivate(self, var):
+        return self.left.derivate(var) + self.right.derivate(var)
 
 class Sub(Operation):
     def __init__(self, left, right):
@@ -152,6 +180,9 @@ class Sub(Operation):
     def evaluate(self, context):
         return self.left.evaluate(context) - self.right.evaluate(context)
 
+    def derivate(self, var):
+        return self.left.derivate(var) - self.right.derivate(var)
+
 class Div(Operation):
     def __init__(self, left, right):
         self.left = left
@@ -162,7 +193,23 @@ class Div(Operation):
 
     def evaluate(self, context):
         return self.left.evaluate(context) / self.right.evaluate(context)
+    
+    def derivate(self, var):
+        if isinstance(self.left, Operation) and isinstance(self.right, Operation):
+            f = self.left
+            fp = f.derivate(var) 
+            g = self.right
+            gp = g.derivate(var)
+            return (fp * g - gp * f) / (g * g)
         
+        if isinstance(self.left, Operation) and isinstance(self.right, Constant):
+            return self.left.derivate(var) / self.right.evaluate(simplification=True)
+        
+        if isinstance(self.left, Constant) and isinstance(self.right, Operation):
+            return self.left.evaluate(simplification=True) * Pow(self.right.evaluate(simplification=True), -1).derivate(var)
+
+        raise NotImplementedError
+
 class Mul(Operation):
     def __init__(self, left, right):
         self.left = left
@@ -173,6 +220,48 @@ class Mul(Operation):
 
     def evaluate(self, context):
         return self.left.evaluate(context) * self.right.evaluate(context)
+    
+    def derivate(self, var):
+        if isinstance(self.left, Variable) and isinstance(self.right, Variable) and var in (self.left, self.right):
+            return self.left if var == self.right else self.right
+        if isinstance(self.left, Constant) and isinstance(self.right, Constant):
+            return self.evaluate(simplification=True)
+        if isinstance(self.left, (Operation, Variable)) and isinstance(self.right, (Operation, Variable)):
+            f = self.left
+            fp = f.derivate(var) 
+            g = self.right
+            gp = g.derivate(var)
+            return fp * g.evaluate(simplification=True) + f.evaluate(simplification=True) * gp
+        
+        if isinstance(self.left, (Operation, Variable)) and isinstance(self.right, Constant):
+            return self.left.derivate(var) * self.right.evaluate(simplification=True)
+        
+        if isinstance(self.left, Constant) and isinstance(self.right, (Operation, Variable)):
+            return self.left.evaluate(simplification=True) * self.right.derivate(var)
+
+        raise NotImplementedError
+
+class Pow(Operation):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def __repr__(self):
+        return f"Pow({self.left!r}, {self.right!r})"
+
+    def evaluate(self, context):
+        return self.left.evaluate(context) ** self.right.evaluate(context)
+    
+    def derivate(self, var):
+        if isinstance(self.left, Operation) and isinstance(self.right, Constant):
+            n = self.right.evaluate(simplification=True)
+            return n * Pow(self.left.evaluate(simplification=True), n - 1) * self.right.derivate(var)
+
+        if isinstance(self.left, Variable) and isinstance(self.right, Constant):
+            n = self.right.evaluate(simplification=True)
+            return n * Pow(self.left.evaluate(simplification=True), n - 1)
+
+        raise NotImplementedError
 
 class Neg(Operation):
     def __init__(self, arg):
@@ -183,15 +272,18 @@ class Neg(Operation):
 
     def evaluate(self, context):
         return -self.arg.evaluate(context)
+    
+    def derivate(self, var):
+        return - self.arg.derivate(var)
 
 
 if __name__ == "__main__":
     x = Variable("x")
     y = Variable("y")
+    z = Variable("z")
     a = Constant(2)
 
-    z = x + y * a
-    print(z)
-    z = z / 2
-    print(z)
-    print(z.evaluate(variables={x: 2, y: 3}))
+    res = x ** -2
+    print(res)
+    print(res.derivate(x))
+    print(res.evaluate(variables={x: 2, y: 3, z: 0}))
