@@ -114,6 +114,9 @@ class Constant(Node):
 class EvaluationError(Exception):
     pass
 
+# TODO: remove the simplification attribute from context
+# Maybe add a simplify method later
+
 class Variable(Node):
     """Variable, can be given a value at evaluation"""
     def __init__(self, name: str=None):
@@ -195,20 +198,7 @@ class Div(Operation):
         return self.left.evaluate(context) / self.right.evaluate(context)
     
     def derivate(self, var):
-        if isinstance(self.left, Operation) and isinstance(self.right, Operation):
-            f = self.left
-            fp = f.derivate(var) 
-            g = self.right
-            gp = g.derivate(var)
-            return (fp * g - gp * f) / (g * g)
-        
-        if isinstance(self.left, Operation) and isinstance(self.right, Constant):
-            return self.left.derivate(var) / self.right.evaluate(simplification=True)
-        
-        if isinstance(self.left, Constant) and isinstance(self.right, Operation):
-            return self.left.evaluate(simplification=True) * Pow(self.right.evaluate(simplification=True), -1).derivate(var)
-
-        raise NotImplementedError
+        return Mul(self.left, Pow(self.right, Constant(-1))).derivate(var)
 
 class Mul(Operation):
     def __init__(self, left, right):
@@ -240,6 +230,10 @@ class Mul(Operation):
             return self.left.evaluate(simplification=True) * self.right.derivate(var)
 
         raise NotImplementedError
+# TODO: remove init and set args to Operation.args for every operation
+#  maybe add accessor for first 2/3 args via xyz or abc
+# It will make operation more general, no need to implement init
+# also possible to access the graph structure for (optimsation, …?¿)
 
 class Pow(Operation):
     def __init__(self, left, right):
@@ -255,11 +249,11 @@ class Pow(Operation):
     def derivate(self, var):
         if isinstance(self.left, Operation) and isinstance(self.right, Constant):
             n = self.right.evaluate(simplification=True)
-            return n * Pow(self.left.evaluate(simplification=True), n - 1) * self.right.derivate(var)
+            return n * Pow(self.left.evaluate(simplification=True), Constant(n - 1)) * self.right.derivate(var)
 
         if isinstance(self.left, Variable) and isinstance(self.right, Constant):
             n = self.right.evaluate(simplification=True)
-            return n * Pow(self.left.evaluate(simplification=True), n - 1)
+            return n * Pow(self.left.evaluate(simplification=True), Constant(n - 1))
 
         raise NotImplementedError
 
@@ -283,7 +277,7 @@ if __name__ == "__main__":
     z = Variable("z")
     a = Constant(2)
 
-    res = x ** -2
+    res = x ** -2 + y * z ** a / z + y
     print(res)
     print(res.derivate(x))
-    print(res.evaluate(variables={x: 2, y: 3, z: 0}))
+    print(res.evaluate(variables={x: 2, y: 3, z: 5}))
