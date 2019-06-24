@@ -1,72 +1,42 @@
 from typing import Dict
 from functools import wraps
-import numbers
+import operator
 
 class NodeClassError(Exception):
     pass
 
-# Weird cyclic dependence
-# NumericOperators depends on all operations and Const AND is baseclass for all nodes
-# Fixes : rethink architecture, monkey patch
 
-def numbers_to_const(func):
+# change to everything that is not a node becomes a Const
+# No need to later add other types
+# maybe deepcopy, would make more sense to not deepcopy
+ 
+def args_to_const(func):
     """Decorator that wraps numbers.Number types from *args in Constant""" 
-    def is_number(obj):
-        return isinstance(obj, numbers.Number)
+    def is_node(obj):
+        return isinstance(obj, Node)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        non_numbers = list(filter(lambda o: not is_number(o), args))
-        numbers = list(map(Constant, filter(is_number, args)))
-        return func(*non_numbers, *numbers, **kwargs)
+        args = (arg if is_node(arg) else Constant(arg) for arg in args)
+        return func(*args, **kwargs)
     return wrapper
 
-class NumericOperators:
-    """Class/interface implementing all the methods to emulate numeric types of python"""
-    @numbers_to_const
-    def __add__(self, right):
-        return Add(self, right)
+class NodeOperators:
+    """Class/interface implementing all the methods to emulate numeric types of python
+    
+    Methods are added later to avoid cyclic reference as the rely on Operations implementation"""
+    
+    @staticmethod
+    def _add_methods(methods):
+        # Add class methods to this and remove them
+        def decorator(cls):
+            for method in methods:
+                setattr(NodeOperators, method, getattr(cls, method))
+            return cls
+        
+        return decorator
 
-    @numbers_to_const
-    def __sub__(self, right):
-        return Sub(self, right)
-
-    @numbers_to_const
-    def __mul__(self, right):
-        return Mul(self, right)
-
-    @numbers_to_const
-    def __truediv__(self, right):
-        return Div(self, right)
-
-    @numbers_to_const
-    def __pow__(self, left):
-        return Pow(self, left)
-
-    @numbers_to_const
-    def __radd__(self, left):
-        return Add(left, self)
-
-    @numbers_to_const
-    def __rsub__(self, left):
-        return Sub(left, self)
-
-    @numbers_to_const
-    def __rmul__(self, left):
-        return Mul(left, self)
-
-    @numbers_to_const
-    def __rtruediv__(self, left):
-        return Div(left, self)
-
-    @numbers_to_const
-    def __rpow__(self, left):
-        return Pow(left, self)
-
-    def __neg__(self):
-        return Neg(self)
-
-class Node(NumericOperators):
+class Node(NodeOperators):
     """Basic block of the computational graph"""
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -107,6 +77,9 @@ class Constant(Node):
 
     def __repr__(self):
         return f"Constant({self.value!r})"
+    
+    def __str__(self):
+        return f"{self.value!s}"
 
     def derivate(self, var):
         return 0
@@ -124,7 +97,10 @@ class Variable(Node):
 
     def __repr__(self):
         return f"Variable({self.name})"
-    
+
+    def __str__(self):
+        return self.name
+
     def evaluate(self, context: Dict=None):
         if not context:
             raise EvaluationError(f"Can’t evaluate {self!r} without context")
@@ -149,22 +125,35 @@ class Variable(Node):
         else:
             return 0
 
+# TODO: remove init and set args to Operation.args for every operation
+#  maybe add accessor for first 2/3 args via xyz or abc
+# It will make operation more general, no need to implement init
+# option to set the number of excpected args 
+# also possible to access the graph structure for (optimsation, …?¿)
+
 class Operation(Node):
     """Base class for all operations"""
     def __init__(self, *args, **kwargs):
         self.args = args
+        self.kwargs = kwargs
+    
+    def __repr__(self):
+        args = map(lambda o:o.__repr__(), self.args)
+        return f"{self.__class__.__name__}({' ,'.join(args)})"
 
     def evaluate(self, context):
         raise NotImplementedError
+    
+    @property
+    def left(self):
+        return self.args[0]
 
+    @property
+    def right(self):
+        return self.args[1]
+
+@NodeOperators._add_methods(("__add__", "__radd__"))
 class Add(Operation):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
-
-    def __repr__(self):
-        return f"Add({self.left!r}, {self.right!r})"
-
     def evaluate(self, context: Dict=None):
         """ Evalute and return the result of the operation """
         return self.left.evaluate(context) + self.right.evaluate(context)
@@ -172,13 +161,21 @@ class Add(Operation):
     def derivate(self, var):
         return self.left.derivate(var) + self.right.derivate(var)
 
-class Sub(Operation):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    def __str__(self):
+        return f"({self.left!s} + {self.right!s})"
 
-    def __repr__(self):
-        return f"Sub({self.left!r}, {self.right!r})"
+    @args_to_const
+    def __add__(self, other):
+        return Add(self, other)
+    
+    @args_to_const
+    def __radd__(self, other):
+        return Add(other, self)
+
+@NodeOperators._add_methods(("__sub__", "__rsub__"))
+class Sub(Operation):
+    def __str__(self):
+        return f"({self.left!s} - {self.right!s})"
 
     def evaluate(self, context):
         return self.left.evaluate(context) - self.right.evaluate(context)
@@ -186,13 +183,18 @@ class Sub(Operation):
     def derivate(self, var):
         return self.left.derivate(var) - self.right.derivate(var)
 
-class Div(Operation):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    @args_to_const
+    def __sub__(self, other):
+        return Sub(self, other)
 
-    def __repr__(self):
-        return f"Div({self.left!r}, {self.right!r})"
+    @args_to_const
+    def __rsub__(self, other):
+        return Sub(other, self)
+
+@NodeOperators._add_methods(("__truediv__", "__rtruediv__"))
+class Div(Operation):
+    def __str__(self):
+        return f"({self.left!s} / {self.right!s})"
 
     def evaluate(self, context):
         return self.left.evaluate(context) / self.right.evaluate(context)
@@ -200,13 +202,18 @@ class Div(Operation):
     def derivate(self, var):
         return Mul(self.left, Pow(self.right, Constant(-1))).derivate(var)
 
-class Mul(Operation):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    @args_to_const
+    def __truediv__(self, other):
+        return Div(self, other)
 
-    def __repr__(self):
-        return f"Mul({self.left!r}, {self.right!r})"
+    @args_to_const
+    def __rtruediv__(self, other):
+        return Div(other, self)
+
+@NodeOperators._add_methods(("__mul__", "__rmul__"))
+class Mul(Operation):
+    def __str__(self):
+        return f"({self.left!s} * {self.right!s})"
 
     def evaluate(self, context):
         return self.left.evaluate(context) * self.right.evaluate(context)
@@ -230,18 +237,19 @@ class Mul(Operation):
             return self.left.evaluate(simplification=True) * self.right.derivate(var)
 
         raise NotImplementedError
-# TODO: remove init and set args to Operation.args for every operation
-#  maybe add accessor for first 2/3 args via xyz or abc
-# It will make operation more general, no need to implement init
-# also possible to access the graph structure for (optimsation, …?¿)
 
+    @args_to_const
+    def __mul__(self, other):
+        return Mul(self, other)
+    
+    @args_to_const
+    def __rmul__(self, other):
+        return Mul(other, self)
+
+@NodeOperators._add_methods(("__pow__", "__rpow__"))
 class Pow(Operation):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
-
-    def __repr__(self):
-        return f"Pow({self.left!r}, {self.right!r})"
+    def __str__(self):
+        return f"({self.left!s} ** {self.right!s})"
 
     def evaluate(self, context):
         return self.left.evaluate(context) ** self.right.evaluate(context)
@@ -256,20 +264,25 @@ class Pow(Operation):
             return n * Pow(self.left.evaluate(simplification=True), Constant(n - 1))
 
         raise NotImplementedError
-
-class Neg(Operation):
-    def __init__(self, arg):
-        self.arg = arg
-
-    def __repr__(self):
-        return f"Neg({self.arg!r})"
-
-    def evaluate(self, context):
-        return -self.arg.evaluate(context)
     
-    def derivate(self, var):
-        return - self.arg.derivate(var)
+    @args_to_const
+    def __pow__(self, other):
+        return Pow(self, other)
 
+    @args_to_const
+    def __rpow__(self, other):
+        return Pow(other, self)
+
+@NodeOperators._add_methods(("__neg__",))
+class Neg(Operation):
+    def evaluate(self, context):
+        return -self.args[0].evaluate(context)
+
+    def derivate(self, var):
+        return - self.args[0].derivate(var)
+
+    def __neg__(self):
+        return Neg(self)
 
 if __name__ == "__main__":
     x = Variable("x")
