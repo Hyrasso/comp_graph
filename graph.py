@@ -21,22 +21,7 @@ def args_to_const(func):
         return func(*args, **kwargs)
     return wrapper
 
-class NodeOperators:
-    """Class/interface implementing all the methods to emulate numeric types of python
-    
-    Methods are added later to avoid cyclic reference as the rely on Operations implementation"""
-    
-    @staticmethod
-    def _add_methods(methods):
-        # Add class methods to this and remove them
-        def decorator(cls):
-            for method in methods:
-                setattr(NodeOperators, method, getattr(cls, method))
-            return cls
-        
-        return decorator
-
-class Node(NodeOperators):
+class Node:
     """Basic block of the computational graph"""
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -44,6 +29,16 @@ class Node(NodeOperators):
             raise NodeClassError(f"Class '{cls.__name__}' doesn’t have an 'evaluate' mehtod")
         setattr(cls, 'evaluate', Node.wrap_evaluate(cls.evaluate))
     
+    @staticmethod
+    def _add_methods(methods):
+        "Add methods from class to Node objects (only special methods starting with __)"
+        def decorator(cls):
+            for method in methods:
+                if method.startswith("__"):
+                    setattr(Node, method, getattr(cls, method))
+            return cls
+        return decorator
+
     @staticmethod
     def wrap_evaluate(method):
         @wraps(method)
@@ -66,6 +61,11 @@ class Node(NodeOperators):
     def evaluate(self, context):
         raise NotImplementedError
 
+    # def grad(self):
+    #     grad = {}
+    #     for var in self.get_variables():
+    #         grad[var] = self.derivate(var)
+    #     return grad
 
 class Constant(Node):
     """Constant, has a constant value set at instantiation"""
@@ -143,17 +143,17 @@ class Operation(Node):
 
     def evaluate(self, context):
         raise NotImplementedError
-    
-    @property
-    def left(self):
-        return self.args[0]
 
-    @property
-    def right(self):
-        return self.args[1]
+    def derivate(self, var):
+        return NotImplementedError
 
-@NodeOperators._add_methods(("__add__", "__radd__"))
+@Node._add_methods(("__add__", "__radd__"))
 class Add(Operation):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.left = left
+        self.right = right
+
     def evaluate(self, context: Dict=None):
         """ Evalute and return the result of the operation """
         return self.left.evaluate(context) + self.right.evaluate(context)
@@ -172,8 +172,13 @@ class Add(Operation):
     def __radd__(self, other):
         return Add(other, self)
 
-@NodeOperators._add_methods(("__sub__", "__rsub__"))
+@Node._add_methods(("__sub__", "__rsub__"))
 class Sub(Operation):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.left = left
+        self.right = right
+
     def __str__(self):
         return f"({self.left!s} - {self.right!s})"
 
@@ -191,8 +196,13 @@ class Sub(Operation):
     def __rsub__(self, other):
         return Sub(other, self)
 
-@NodeOperators._add_methods(("__truediv__", "__rtruediv__"))
+@Node._add_methods(("__truediv__", "__rtruediv__"))
 class Div(Operation):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.left = left
+        self.right = right
+
     def __str__(self):
         return f"({self.left!s} / {self.right!s})"
 
@@ -210,8 +220,13 @@ class Div(Operation):
     def __rtruediv__(self, other):
         return Div(other, self)
 
-@NodeOperators._add_methods(("__mul__", "__rmul__"))
+@Node._add_methods(("__mul__", "__rmul__"))
 class Mul(Operation):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.left = left
+        self.right = right
+
     def __str__(self):
         return f"({self.left!s} * {self.right!s})"
 
@@ -246,8 +261,13 @@ class Mul(Operation):
     def __rmul__(self, other):
         return Mul(other, self)
 
-@NodeOperators._add_methods(("__pow__", "__rpow__"))
+@Node._add_methods(("__pow__", "__rpow__"))
 class Pow(Operation):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.left = left
+        self.right = right
+
     def __str__(self):
         return f"({self.left!s} ** {self.right!s})"
 
@@ -273,10 +293,10 @@ class Pow(Operation):
     def __rpow__(self, other):
         return Pow(other, self)
 
-@NodeOperators._add_methods(("__neg__",))
+@Node._add_methods(("__neg__",))
 class Neg(Operation):
     def evaluate(self, context):
-        return -self.args[0].evaluate(context)
+        return - self.args[0].evaluate(context)
 
     def derivate(self, var):
         return - self.args[0].derivate(var)
