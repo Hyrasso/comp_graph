@@ -1,194 +1,52 @@
-from typing import Dict
+""" Define all the python operations and overload them for F base class """
+from typing import Any, Tuple
+from function import F, Const
 
-from graph import Node, Constant, Variable
-from utils import args_to_const
 
-# TODO:
-#  maybe add accessor for first 2/3 args via xyz or abc
-# It will make operation more general, no need to implement init
-# option to set the number of excpected args 
-# also possible to access the graph structure for (optimsation, …?¿)
+@F._add_methods(("__add__", "__radd__"))
+class Add(F):
+    def __init__(self, a, b):
+        self.args = (a, b)
+        self.a = a
+        self.b = b
 
-class Operation(Node):
-    """Base class for all operations"""
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-    
-    def __repr__(self):
-        args = map(lambda o:o.__repr__(), self.args)
-        return f"{self.__class__.__name__}({' ,'.join(args)})"
+    def compute(self) -> Any:
+        return self.a.compute() + self.b.compute()
 
-    def evaluate(self, context):
-        raise NotImplementedError
+    def grad(self) -> Tuple[int, int]:
+        return Const(1), Const(1)
 
-    def derivate(self, var):
-        return NotImplementedError
+    def __repr__(self) -> str:
+        return "(" + repr(self.a) + " + " + repr(self.b) + ")"
 
-@Node._add_methods(("__add__", "__radd__"))
-class Add(Operation):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-        self.left = left
-        self.right = right
+    def __add__(self, o):
+        if not isinstance(o, F):
+            o = Const(o)
+        return Add(self, o)
 
-    def evaluate(self, context: Dict=None):
-        """ Evalute and return the result of the operation """
-        return self.left.evaluate(context) + self.right.evaluate(context)
-    
-    def derivate(self, var):
-        return self.left.derivate(var) + self.right.derivate(var)
+    def __radd__(self, o):
+        return Add.__add__(o, self)
 
-    def __str__(self):
-        return f"({self.left!s} + {self.right!s})"
+@F._add_methods(("__mul__", "__rmul__"))
+class Mul(F):
+    def __init__(self, a: Any, b: Any):
+        self.a = a
+        self.b = b
+        self.args = (a, b)
 
-    @args_to_const
-    def __add__(self, other):
-        return Add(self, other)
-    
-    @args_to_const
-    def __radd__(self, other):
-        return Add(other, self)
+    def compute(self) -> Any:
+        return self.a.compute() * self.b.compute()
 
-@Node._add_methods(("__sub__", "__rsub__"))
-class Sub(Operation):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-        self.left = left
-        self.right = right
+    def grad(self) -> Tuple[Any, Any]:
+        return (self.b, self.a)
 
-    def __str__(self):
-        return f"({self.left!s} - {self.right!s})"
+    def __repr__(self) -> str:
+        return repr(self.a) + " * " + repr(self.b)
 
-    def evaluate(self, context):
-        return self.left.evaluate(context) - self.right.evaluate(context)
+    def __mul__(self, o):
+        if not isinstance(o, F):
+            o = Const(o)
+        return Mul(self, o)
 
-    def derivate(self, var):
-        return self.left.derivate(var) - self.right.derivate(var)
-
-    @args_to_const
-    def __sub__(self, other):
-        return Sub(self, other)
-
-    @args_to_const
-    def __rsub__(self, other):
-        return Sub(other, self)
-
-@Node._add_methods(("__truediv__", "__rtruediv__"))
-class Div(Operation):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-        self.left = left
-        self.right = right
-
-    def __str__(self):
-        return f"({self.left!s} / {self.right!s})"
-
-    def evaluate(self, context):
-        return self.left.evaluate(context) / self.right.evaluate(context)
-    
-    def derivate(self, var):
-        return Mul(self.left, Pow(self.right, Constant(-1))).derivate(var)
-
-    @args_to_const
-    def __truediv__(self, other):
-        return Div(self, other)
-
-    @args_to_const
-    def __rtruediv__(self, other):
-        return Div(other, self)
-
-@Node._add_methods(("__mul__", "__rmul__"))
-class Mul(Operation):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-        self.left = left
-        self.right = right
-
-    def __str__(self):
-        return f"({self.left!s} * {self.right!s})"
-
-    def evaluate(self, context):
-        return self.left.evaluate(context) * self.right.evaluate(context)
-    
-    def derivate(self, var):
-        if isinstance(self.left, Variable) and isinstance(self.right, Variable) and var in (self.left, self.right):
-            return self.left if var == self.right else self.right
-        if isinstance(self.left, Constant) and isinstance(self.right, Constant):
-            return self.evaluate(simplification=True)
-        if isinstance(self.left, (Operation, Variable)) and isinstance(self.right, (Operation, Variable)):
-            f = self.left
-            fp = f.derivate(var) 
-            g = self.right
-            gp = g.derivate(var)
-            return fp * g.evaluate(simplification=True) + f.evaluate(simplification=True) * gp
-        
-        if isinstance(self.left, (Operation, Variable)) and isinstance(self.right, Constant):
-            return self.left.derivate(var) * self.right.evaluate(simplification=True)
-        
-        if isinstance(self.left, Constant) and isinstance(self.right, (Operation, Variable)):
-            return self.left.evaluate(simplification=True) * self.right.derivate(var)
-
-        raise NotImplementedError
-
-    @args_to_const
-    def __mul__(self, other):
-        return Mul(self, other)
-    
-    @args_to_const
-    def __rmul__(self, other):
-        return Mul(other, self)
-
-@Node._add_methods(("__pow__", "__rpow__"))
-class Pow(Operation):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-        self.left = left
-        self.right = right
-
-    def __str__(self):
-        return f"({self.left!s} ** {self.right!s})"
-
-    def evaluate(self, context):
-        return self.left.evaluate(context) ** self.right.evaluate(context)
-    
-    def derivate(self, var):
-        if isinstance(self.left, Operation) and isinstance(self.right, Constant):
-            n = self.right.evaluate(simplification=True)
-            return n * Pow(self.left.evaluate(simplification=True), Constant(n - 1)) * self.right.derivate(var)
-
-        if isinstance(self.left, Variable) and isinstance(self.right, Constant):
-            n = self.right.evaluate(simplification=True)
-            return n * Pow(self.left.evaluate(simplification=True), Constant(n - 1))
-
-        raise NotImplementedError
-    
-    @args_to_const
-    def __pow__(self, other):
-        return Pow(self, other)
-
-    @args_to_const
-    def __rpow__(self, other):
-        return Pow(other, self)
-
-@Node._add_methods(("__neg__",))
-class Neg(Operation):
-    def evaluate(self, context):
-        return - self.args[0].evaluate(context)
-
-    def derivate(self, var):
-        return - self.args[0].derivate(var)
-
-    def __neg__(self):
-        return Neg(self)
-
-if __name__ == "__main__":
-    x = Variable("x")
-    y = Variable("y")
-    z = Variable("z")
-    a = Constant(2)
-
-    res = x ** -2 + y * z ** a / z + y
-    print(res)
-    print(res.derivate(x))
-    print(res.evaluate(variables={x: 2, y: 3, z: 5}))
+    def __rmul__(self, o):
+        return Mul.__add__(o, self)

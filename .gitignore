@@ -1,3 +1,4 @@
 __pycache__
 .vscode
 .noseids
+.mypy_cache

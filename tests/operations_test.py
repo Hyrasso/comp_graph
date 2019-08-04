@@ -1,5 +1,4 @@
 import unittest
-import graph, operations
 
 class Test_Operations(unittest.TestCase):
     def test_add_evaluation(self):
