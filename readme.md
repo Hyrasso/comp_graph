@@ -6,6 +6,7 @@ Python project implementing computational graph and differentiation on graph
     x = Var("x")
     y = Var("y")
     a = Const(2)
+    
     z = x ** 2 + y * a
     print(z)
     # ((x ^ 2) + (y * 2))
@@ -13,6 +14,7 @@ Python project implementing computational graph and differentiation on graph
     print(repr(z))
     # Div(Add(Pow(x, 2), Mul(y, 2)), 2)
     print(z.compute({x: 2, y: 3}))
+
     # 5.0
     
     dzdx = z.differentiate(x)
