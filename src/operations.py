@@ -30,7 +30,7 @@ class Add(F):
         return Const(1), Const(1)
 
     def __str__(self) -> str:
-        return f"({self.a!r} + {self.b!r})"
+        return f"({self.a} + {self.b})"
 
     def __add__(self, o):
         if not isinstance(o, F):
@@ -51,7 +51,7 @@ class Sub(F):
         return Const(1), Const(-1)
 
     def __str__(self) -> str:
-        return f"({self.a!r} - {self.b!r})"
+        return f"({self.a} - {self.b})"
 
     def __sub__(self, o):
         if not isinstance(o, F):
@@ -71,7 +71,7 @@ class Neg(F):
         return tuple(Const(-1))
 
     def __str__(self) -> str:
-        return f"({self.a!r} - {self.b!r})"
+        return f"-{self.a})"
 
     def __neg__(self):
         return Neg(self)
@@ -90,7 +90,7 @@ class Mul(F):
         return self.b, self.a
 
     def __str__(self) -> str:
-        return f"({self.a!r} * {self.b!r})"
+        return f"({self.a} * {self.b})"
 
     def __mul__(self, o):
         if not isinstance(o, F):
@@ -112,7 +112,7 @@ class Mul(F):
         return (self.b, self.a)
 
     def __str__(self) -> str:
-        return f"({self.a!r} * {self.b!r})"
+        return f"({self.a} * {self.b})"
 
     def __mul__(self, o):
         if not isinstance(o, F):
@@ -133,7 +133,7 @@ class Div(F):
         return Const(1) / self.b, - self.a / self.b ** 2 
 
     def __str__(self) -> str:
-        return f"({self.a!r} + {self.b!r})"
+        return f"({self.a} / {self.b})"
 
     def __truediv__(self, o):
         if not isinstance(o, F):
@@ -155,7 +155,7 @@ class Pow(F):
         return self.b * self.a ** (self.b - 1), self.a ** self.b * Log(self.b)
 
     def __str__(self) -> str:
-        return f"({self.a!r} ^ {self.b!r})"
+        return f"({self.a} ^ {self.b})"
 
     def __pow__(self, o):
         if not isinstance(o, F):

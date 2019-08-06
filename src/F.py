@@ -18,6 +18,15 @@ class F(abc.ABC):
     args: Tuple[Any, ...] = tuple()
     grad: Tuple[F, ...] = tuple()
 
+    def __init_subclass__(cls):
+        if hasattr(cls, "compute"):
+            _compute = getattr(cls, "compute")
+            def compute(self, ctx=None):
+                if ctx:
+                    self.set_context(ctx)
+                return _compute(self)
+            setattr(cls, "compute", compute)
+        return super().__init_subclass__()
     def __init__(self, *args, **kwargs):
         self.args = tuple(args)
 
