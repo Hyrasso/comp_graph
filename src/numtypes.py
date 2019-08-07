@@ -1,13 +1,14 @@
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional
 from .F import F, Const
 
 
 class Var(F):
     def __init__(self, name: str = "Var"):
         self.name = name
+        self.value = 0
 
     def compute(self) -> F:
-        return self.ctx[self]
+        return self.value
 
     def grad(self):
         return (Const(1),)
@@ -25,4 +26,3 @@ class Var(F):
     # if eq is defined, hash must be too?
     def __hash__(self):
         return super().__hash__()
-

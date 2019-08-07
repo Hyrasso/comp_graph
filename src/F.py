@@ -75,7 +75,8 @@ class F(abc.ABC):
     # ideally have a function to get a function from the graph,
     # give all vars to that function, returns result
     def set_context(self, ctx):
-        self.ctx = ctx
+        if self in ctx:
+            self.value = ctx[self]
         for arg in self.args:
             arg.set_context(ctx)
 
@@ -86,6 +87,10 @@ class F(abc.ABC):
 
     def __hash__(self):
         return super().__hash__()
+
+    def __call__(self, ctx) -> F:
+        """Replace all var in ctx with their value given, leave the other unchanged return F"""
+        self.set_var_val()
 
 class Const(F):
     def __init__(self, a: Any):
