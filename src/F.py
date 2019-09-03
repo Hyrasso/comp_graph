@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any, Tuple, Callable
 import abc
+from functools import wraps
 
 # For 'recursive eval", set context, propage it to all children
 # add recursive eval where call eval for children first with context
@@ -12,11 +13,25 @@ import abc
 # If function: taking comparaison method, operands and a Node  
 # turns that into differentiable mathematical expression?
 # ex if a > b then foo -> step(a - b) * foo
+
+def set_args(f):
+    """ Decorator for init method, set self._args with *args before calling init """
+    #@wraps
+    def wrapper(self, *args, **kwargs):
+        self._args = args
+        return f(self, *args, **kwargs)
+    return wrapper
+
 class F(abc.ABC):
     """Basic block of the computational graph"""
 
-    args: Tuple[Any, ...] = tuple()
-    grad: Tuple[F, ...] = tuple()
+    # type annotation, should be set for each instance
+    args: Tuple[Any, ...]
+
+    # global attr (bad)
+    # could be a chainmap?
+    # use with g.context(...) as ng:ng.compute() ?
+    context: Dict[F, Any] = {}
 
     def __init_subclass__(cls):
         if hasattr(cls, "compute"):
@@ -26,13 +41,21 @@ class F(abc.ABC):
                     self.set_context(ctx)
                 return _compute(self)
             setattr(cls, "compute", compute)
+        
+            
+        if hasattr(cls, "__init__"):
+
+            init = getattr(cls, "__init__")
+            setattr(cls, "__init__", set_args(init))
         return super().__init_subclass__()
+
+    # TODO: decorate instead of override, calling super.init from subclass for args unknown by the parent doesnt make much sense
     def __init__(self, *args, **kwargs):
-        self.args = tuple(args)
+        self._args = args
 
     @abc.abstractmethod
     def compute(self) -> Any:
-        return NotImplemented
+        raise NotImplemented
 
     @staticmethod
     def overload_numeric(method: Callable[[Any], F]) -> Callable[[F], F]:
@@ -50,7 +73,7 @@ class F(abc.ABC):
         # f can be const, variable, functions of anything
         # dz/dx = dz/df * df/dx + dz/dg * dg/dx
         res = None
-        for arg, darg in zip(self.args, self.grad()):
+        for arg, darg in zip(self._args, self.grad()):
             # recursive fonction, skip for now because of how Var is defined
             if self == arg:
                 continue
@@ -67,22 +90,14 @@ class F(abc.ABC):
         return res
 
     def __repr__(self) -> str:
-        return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self.args)))
+        return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self._args)))
 
-    # find a better way,
-    # if a node is in 2 graphs, its context will be changed by both
-    # now set_context needs to be used before every call to compute
-    # ideally have a function to get a function from the graph,
-    # give all vars to that function, returns result
     def set_context(self, ctx):
-        if self in ctx:
-            self.value = ctx[self]
-        for arg in self.args:
-            arg.set_context(ctx)
+        F.context = ctx
 
     def __eq__(self, value):
         if isinstance(value, F):
-            return (type(self), self.args) == (type(value), value.args)
+            return (type(self), self._args) == (type(value), value._args)
         return super().__eq__(value)
 
     def __hash__(self):
