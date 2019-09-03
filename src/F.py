@@ -67,7 +67,9 @@ class F(abc.ABC):
         return decorator
 
     def differentiate(self, var: F) -> F:
-        """ Define partial derivative relative to var """
+        """ Define partial derivative relative to var
+            TODO: add wrt tensor
+        """
         # chain rule for multi variable
         # z = f + g
         # f can be const, variable, functions of anything

@@ -19,7 +19,7 @@ from .functions import Log
 @F.overload_numeric("__add__")
 class Add(F):
     def __init__(self, a: F, b: F):
-        self.args = (a, b)
+        self._args = (a, b)
         self.a = a
         self.b = b
 
@@ -81,7 +81,7 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self.args = (a, b)
+        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -103,7 +103,7 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self.args = (a, b)
+        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -122,7 +122,7 @@ class Mul(F):
 @F.overload_numeric("__truediv__")
 class Div(F):
     def __init__(self, a, b):
-        self.args = (a, b)
+        self._args = (a, b)
         self.a = a
         self.b = b
 
@@ -161,3 +161,26 @@ class Pow(F):
         if not isinstance(o, F):
             o = Const(o)
         return Pow(self, o)
+
+
+@F.overload_numeric("__matmul__")
+class Dot(F):
+    def __init__(self, a: F, b: F):
+        super().__init__(a, b)
+        self.a = a
+        self.b = b
+        self.c = self.a @ self.b
+
+    def compute(self) -> Any:
+        return self.a.compute() @ self.b.compute()
+
+    def grad(self) -> Tuple[F, F]:
+        return self.b, self.a
+
+    def __str__(self) -> str:
+        return f"({self.a} @ {self.b})"
+
+    def __matmul__(self, o):
+        if not isinstance(o, F):
+            o = Const(o)
+        return Dot(self, o)
