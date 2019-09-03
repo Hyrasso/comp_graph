@@ -26,11 +26,11 @@ model = m * x + b
 loss = (model - y) ** 2
 
 def f(x):
-    return x * 1.5 - 1
+    return x * 1050 - 10
 # mse = sum(loss for (x, y) in train) / len(train) 
 lr = 0.001
-m.value = 0.1
-b.value = 0.1
+m.value = 0.
+b.value = 0.
 
 training = [(x, f(x)) for x in range(50)]
 shuffle(training)
