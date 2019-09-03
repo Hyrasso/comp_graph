@@ -44,7 +44,9 @@ class F(abc.ABC):
         return decorator
 
     def differentiate(self, var: F) -> F:
-        """ Define partial derivative relative to var """
+        """ Define partial derivative relative to var
+            TODO: add wrt tensor
+        """
         # chain rule for multi variable
         # z = f + g
         # f can be const, variable, functions of anything
@@ -75,6 +77,7 @@ class F(abc.ABC):
     # ideally have a function to get a function from the graph,
     # give all vars to that function, returns result
     def set_context(self, ctx):
+        assert isinstance(ctx, dict), (self, ctx)
         if self in ctx:
             self.value = ctx[self]
         for arg in self.args:

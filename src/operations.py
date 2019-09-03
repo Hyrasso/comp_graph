@@ -161,3 +161,26 @@ class Pow(F):
         if not isinstance(o, F):
             o = Const(o)
         return Pow(self, o)
+
+
+@F.overload_numeric("__matmul__")
+class Dot(F):
+    def __init__(self, a: F, b: F):
+        super().__init__(a, b)
+        self.a = a
+        self.b = b
+        self.c = self.a @ self.b
+
+    def compute(self) -> Any:
+        return self.a.compute() @ self.b.compute()
+
+    def grad(self) -> Tuple[F, F]:
+        return self.b, self.a
+
+    def __str__(self) -> str:
+        return f"({self.a} @ {self.b})"
+
+    def __matmul__(self, o):
+        if not isinstance(o, F):
+            o = Const(o)
+        return Dot(self, o)
