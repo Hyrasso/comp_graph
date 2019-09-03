@@ -11,3 +11,21 @@ class Log(F):
     
     def grad(self):
         return 1 / self.a
+
+class Dirac(F):
+    def compute(self):
+        return 1 if self.args[0].compute() == 0 else 0
+    
+    def grad(self):
+        return (Const(0),) # almost but actually not
+
+class Step(F):
+    def compute(self):
+        return 1 if self.args[0].compute() >= 0 else 0
+    
+    def grad(self):
+        return (Dirac(self.args[0]),)
+
+
+def Max(a, b):
+    return Step(a - b) * a + Step(b - a) * b - Dirac(a - b) * a
