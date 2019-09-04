@@ -4,6 +4,7 @@ from .F import F, Const
 from functools import reduce
 import operator
 from .functions import Log
+from .tensor import matmul
 
 # object.__add__(self, other) - done
 # object.__sub__(self, other) - done
@@ -19,7 +20,6 @@ from .functions import Log
 @F.overload_numeric("__add__")
 class Add(F):
     def __init__(self, a: F, b: F):
-        self._args = (a, b)
         self.a = a
         self.b = b
 
@@ -40,7 +40,6 @@ class Add(F):
 @F.overload_numeric("__sub__")
 class Sub(F):
     def __init__(self, a: F, b: F):
-        super().__init__(a, b)
         self.a = a
         self.b = b
 
@@ -61,7 +60,6 @@ class Sub(F):
 @F.overload_numeric("__neg__")
 class Neg(F):
     def __init__(self, a: F):
-        super().__init__(a)
         self.a = a
 
     def compute(self) -> Any:
@@ -81,7 +79,6 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -103,7 +100,6 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -164,18 +160,18 @@ class Pow(F):
 
 
 @F.overload_numeric("__matmul__")
-class Dot(F):
+class Matmul(F):
     def __init__(self, a: F, b: F):
         super().__init__(a, b)
         self.a = a
         self.b = b
-        self.c = self.a @ self.b
+        self.c = matmul(a, b)
 
     def compute(self) -> Any:
-        return self.a.compute() @ self.b.compute()
+        return self.c.compute()
 
     def grad(self) -> Tuple[F, F]:
-        return self.b, self.a
+        return self.c.differentiate(self.a), self.c.differentiate(self.b)
 
     def __str__(self) -> str:
         return f"({self.a} @ {self.b})"
@@ -183,4 +179,4 @@ class Dot(F):
     def __matmul__(self, o):
         if not isinstance(o, F):
             o = Const(o)
-        return Dot(self, o)
+        return Matmul(self, o)

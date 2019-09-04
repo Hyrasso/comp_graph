@@ -13,17 +13,17 @@ class Log(F):
 
 class Dirac(F):
     def compute(self):
-        return 1 if self.args[0].compute() == 0 else 0
+        return 1 if self._args[0].compute() == 0 else 0
     
     def grad(self):
         return (Const(0),) # almost but actually not
 
 class Step(F):
     def compute(self):
-        return 1 if self.args[0].compute() >= 0 else 0
+        return 1 if self._args[0].compute() >= 0 else 0
     
     def grad(self):
-        return (Dirac(self.args[0]),)
+        return (Dirac(self._args[0]),)
 
 
 def Max(a, b):

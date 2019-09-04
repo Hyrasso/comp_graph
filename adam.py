@@ -18,11 +18,11 @@ class Adam:
 
         self.t = 0
 
-    def step(self, ctx):
+    def step(self):
         self.t += 1
         f_grad = self.f.differentiate(self.parameters)
-        f_grad.set_context({self.parameters:self.theta, **ctx})
-        g = f_grad.compute()
+        with f_grad.set_context({self.parameters:self.theta}):
+            g = f_grad.compute()
         self.m = self.b1 * self.m + (1 - self.b1) * g
         self.v = self.b2 * self.v + (1 - self.b2) * g ** 2
         m_bc = self.m / (1 - self.b1 ** self.t)
@@ -38,7 +38,7 @@ w = Var("w")
 b = Var("b")
 
 def f(x):
-    return x * 20
+    return x * 10
 
 def relu(x):
     return Max(Const(0), x)
@@ -51,5 +51,6 @@ opt = Adam(loss, w, 0.)
 
 for i in range(100):
     for labels, targets in [(e, f(e)) for e in range(i, i+100)]:
-        opt.step({x:labels, y:targets})
+        with loss.set_context({x:labels, y:targets}):
+            opt.step()
     print(i, opt.theta)

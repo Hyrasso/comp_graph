@@ -4,15 +4,6 @@ from random import shuffle
 import numpy as np
 from functools import reduce
 
-def var_tensor(shape, base_name="A"):
-    if len(shape) == 1:
-        return [Var(f"{base_name}{i}") for i in range(shape[0])]
-    else:
-        return [var_tensor(shape[1:], base_name=base_name + " i") for i in range(shape[1])]
-
-def iter_sum(vec):
-    return reduce(Add, (e for e in vec))
-
 # def scal_tensor_mul(scal, tensor):
 #     for e in tensor:
 #         e *= scal
@@ -25,8 +16,8 @@ def iter_sum(vec):
 batch_size = 10
 m = Var("m")
 b = Var("b")
-xs = var_tensor((batch_size,), "X")
-ys = var_tensor((batch_size,), "Y")
+xs = np.array(list(Var(f"X{i}") for i in batch_size))
+ys = np.array(list(Var(f"Y{i}") for i in batch_size))
 
 # stochastic gradien descent with batch
 def get_model(x):
@@ -41,7 +32,7 @@ loss = iter_sum((get_model(x) - y) ** 2 for x, y in zip(xs, ys))
 print(loss)
 
 def f(x):
-    return x * 1050 - 10
+    return x * 10.50 - 1.2
 # mse = sum(loss for (x, y) in train) / len(train) 
 lr = 0.001
 m.value = 0.
@@ -59,10 +50,12 @@ for epoch in range(50):
     targets = f(labels)
     for i in range(len(labels) // batch_size):
         ctx = dict(zip(xs, labels[i*batch_size:(i+1)*batch_size]))
+        ctx.update({m:m.value, b:b.value})
         ctx.update(dict(zip(ys, targets[i*batch_size:(i+1)*batch_size])))
-        loss.set_context(ctx)
-        m.value = m_update.compute()
-        b.value = b_update.compute()
+        with loss.set_context(ctx):
+            m.value = m_update.compute()
+            b.value = b_update.compute()
     print(m, m.value)
     print(b, b.value)
-    print("loss", loss.compute())
+    with loss.set_context(ctx):
+        print("loss", loss.compute())

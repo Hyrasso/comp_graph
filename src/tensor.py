@@ -1,6 +1,8 @@
-from typing import List, Tuple, Union, Iterable
+from typing import List, Tuple, Union, Iterable, Callable
 from functools import reduce, partial
 import numpy as np
+from functools import reduce
+from .F import F, Const
 
 prod = partial(reduce, lambda a, b:a*b)
 
@@ -21,10 +23,10 @@ prod = partial(reduce, lambda a, b:a*b)
 #     return flatten((li for e in l for li in e), shape=shape[1:])
 
 class Tensor:
-    def __init__(self, tensor, shape=None):
+    def __init__(self, tensor):
         # self._tensor = flatten(tensor, self.shape)
         self._tensor = np.array(tensor)
-    
+
     @property
     def shape(self):
         return self._tensor.shape
@@ -41,12 +43,46 @@ class Tensor:
             res = Tensor(res)
         return res
     
-    def __matmul__(self, o):
-        return self @ o
-        
+    def __setitem__(self, o, value):
+        self._tensor[o] = value
 
-td = (((1, 2), (3, 4), (5, 6))) 
-t = Tensor(td)
-print(t.shape)
-print(t[0, 1])
+    def differentiate(self, var):
+        if self == var:
+            return Tensor.ones((self.shape))
+        return self.apply_each(lambda e:e.differentiate(var))
+    
+    def apply_each(self, function: Callable):
+        self._tensor
+        vfunction = np.vectorize(function)
+        return Tensor(vfunction(self._tensor))
+
+    def transpose(self):
+        return Tensor(self._tensor.T)
+    
+    @staticmethod
+    def ones(shape):
+        n = 1
+        for d in shape:
+            n *= d
+        ones = np.array([Const(1)] * n).reshape(shape)
+        return Tensor(ones)
+    
+    @staticmethod
+    def from_vector(vector):
+        """ Makes a 1xN Tensor from a vector with size N """
+        vector = np.array(vector)
+        return Tensor(vector.reshape((1, 2)))
+
+def iter_sum(vec: F):
+    res = Const(0)
+    for e in vec:
+        res += e
+    return res
+
+def matmul(a, b):
+    res = Tensor.ones((a.shape[0], b.shape[1]))
+    for i in range(a.shape[1]):
+        for j in range(b.shape[0]):
+            res[i, j] = iter_sum(a[:, i] * b[j, :])
+    return res
 

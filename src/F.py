@@ -1,18 +1,10 @@
 from __future__ import annotations
+from collections import ChainMap
 from typing import Any, Tuple, Callable
 import abc
 from functools import wraps
+from contextlib import contextmanager
 
-# For 'recursive eval", set context, propage it to all children
-# add recursive eval where call eval for children first with context
-
-# For now use evaluate fonction
-#  in the future move everything to other some 'compile' method
-#  that can generate 'optimized' code for evalutaion
-
-# If function: taking comparaison method, operands and a Node  
-# turns that into differentiable mathematical expression?
-# ex if a > b then foo -> step(a - b) * foo
 
 def set_args(f):
     """ Decorator for init method, set self._args with *args before calling init """
@@ -31,18 +23,9 @@ class F(abc.ABC):
     # global attr (bad)
     # could be a chainmap?
     # use with g.context(...) as ng:ng.compute() ?
-    context: Dict[F, Any] = {}
+    context: ChainMap = ChainMap()
 
     def __init_subclass__(cls):
-        if hasattr(cls, "compute"):
-            _compute = getattr(cls, "compute")
-            def compute(self, ctx=None):
-                if ctx:
-                    self.set_context(ctx)
-                return _compute(self)
-            setattr(cls, "compute", compute)
-        
-            
         if hasattr(cls, "__init__"):
 
             init = getattr(cls, "__init__")
@@ -55,7 +38,7 @@ class F(abc.ABC):
 
     @abc.abstractmethod
     def compute(self) -> Any:
-        raise NotImplemented
+        ...
 
     @staticmethod
     def overload_numeric(method: Callable[[Any], F]) -> Callable[[F], F]:
@@ -94,8 +77,11 @@ class F(abc.ABC):
     def __repr__(self) -> str:
         return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self._args)))
 
+    @contextmanager
     def set_context(self, ctx):
-        F.context = ctx
+        F.context = F.context.new_child(ctx)
+        yield
+        F.context = F.context.parents
 
     def __eq__(self, value):
         if isinstance(value, F):
