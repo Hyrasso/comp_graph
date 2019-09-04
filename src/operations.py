@@ -19,7 +19,6 @@ from .functions import Log
 @F.overload_numeric("__add__")
 class Add(F):
     def __init__(self, a: F, b: F):
-        self._args = (a, b)
         self.a = a
         self.b = b
 
@@ -81,7 +80,6 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -103,7 +101,6 @@ class Mul(F):
     def __init__(self, a: F, b: F):
         self.a = a
         self.b = b
-        self._args = (a, b)
 
     def compute(self) -> Any:
         return self.a.compute() * self.b.compute()
@@ -122,7 +119,6 @@ class Mul(F):
 @F.overload_numeric("__truediv__")
 class Div(F):
     def __init__(self, a, b):
-        self._args = (a, b)
         self.a = a
         self.b = b
 

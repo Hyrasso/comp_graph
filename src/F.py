@@ -2,24 +2,29 @@ from __future__ import annotations
 from typing import Any, Tuple, Callable
 import abc
 from functools import wraps
-
-# For 'recursive eval", set context, propage it to all children
-# add recursive eval where call eval for children first with context
-
-# For now use evaluate fonction
-#  in the future move everything to other some 'compile' method
-#  that can generate 'optimized' code for evalutaion
+import numpy as np
+from collections import ChainMap
+from contextlib import contextmanager
 
 # If function: taking comparaison method, operands and a Node  
 # turns that into differentiable mathematical expression?
 # ex if a > b then foo -> step(a - b) * foo
 
-def set_args(f):
+def set_args(func):
     """ Decorator for init method, set self._args with *args before calling init """
-    #@wraps
+    @wraps(func)
     def wrapper(self, *args, **kwargs):
         self._args = args
-        return f(self, *args, **kwargs)
+        return func(self, *args, **kwargs)
+    return wrapper
+
+def no_numpy(func):
+    """ Raise TypeError if any argument is a numpy array """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if any(isinstance(e, np.ndarray) for e in args):
+            return NotImplemented
+        return func(*args, **kwargs)
     return wrapper
 
 class F(abc.ABC):
@@ -29,20 +34,9 @@ class F(abc.ABC):
     args: Tuple[Any, ...]
 
     # global attr (bad)
-    # could be a chainmap?
-    # use with g.context(...) as ng:ng.compute() ?
-    context: Dict[F, Any] = {}
+    context: ChainMap = ChainMap()
 
     def __init_subclass__(cls):
-        if hasattr(cls, "compute"):
-            _compute = getattr(cls, "compute")
-            def compute(self, ctx=None):
-                if ctx:
-                    self.set_context(ctx)
-                return _compute(self)
-            setattr(cls, "compute", compute)
-        
-            
         if hasattr(cls, "__init__"):
 
             init = getattr(cls, "__init__")
@@ -55,21 +49,20 @@ class F(abc.ABC):
 
     @abc.abstractmethod
     def compute(self) -> Any:
-        raise NotImplemented
+        ...
 
     @staticmethod
-    def overload_numeric(method: Callable[[Any], F]) -> Callable[[F], F]:
+    def overload_numeric(method_name: str) -> F:
         """ Add methods from class to F, used to overload __operations """
         def decorator(cls: F) -> F:
-            setattr(F, method, getattr(cls, method))
-
+            method = getattr(cls, method_name)
+            method = no_numpy(method)
+            setattr(F, method_name, method)
             return cls
         return decorator
 
     def differentiate(self, var: F) -> F:
-        """ Define partial derivative relative to var
-            TODO: add wrt tensor
-        """
+        """ Define partial derivative relative to var """
         # chain rule for multi variable
         # z = f + g
         # f can be const, variable, functions of anything
@@ -93,9 +86,12 @@ class F(abc.ABC):
 
     def __repr__(self) -> str:
         return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self._args)))
-
+    
+    @contextmanager
     def set_context(self, ctx):
-        F.context = ctx
+        F.context = F.context.new_child(ctx)
+        yield
+        F.context = F.context.parents
 
     def __eq__(self, value):
         if isinstance(value, F):

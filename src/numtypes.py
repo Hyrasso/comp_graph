@@ -4,19 +4,11 @@ from .F import F, Const
 class Var(F):
     def __init__(self, name: str = "Var", value: Any = None):
         self.name = name
-        self._value = None
 
     def compute(self) -> F:
-        return F.context.get(self, self.value)
+        return F.context.get(self, self)
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, value):
-        self._value = value
-
+    # grad for var is never called as it implements differentiate directly
     def grad(self):
         return (Const(1),)
 
