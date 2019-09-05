@@ -1,5 +1,5 @@
 from src import *
-from src.operations import Add
+from src.np_functions import *
 from random import shuffle
 import numpy as np
 from functools import reduce
@@ -15,11 +15,12 @@ from functools import reduce
 input_size = 2
 # function to model R2 -> R
 
-batch_size = 10
+batch_size = 20
+
 theta = np.array([Var(f"t{i}") for i in range(input_size + 1)]).reshape((input_size + 1, 1))
 
 xs = np.array(list([Const(1), Var(f"X{i} 1"), Var(f"X{i} 0")] for i in range(batch_size)))
-ys = np.array(list([Const(1), Var(f"Y{i} 1"), Var(f"Y{i} 0")] for i in range(batch_size)))
+ys = np.array([Var(f"Y{i}") for i in range(batch_size)]).reshape((batch_size, 1))
 
 # stochastic gradien descent with batch
 def get_model(x):
@@ -32,43 +33,27 @@ model = xs @ theta
 
 loss = np.sum((model - ys) ** 2)
 
-print(loss)
-
 def f(x):
-    return x @ np.array(((1,),  (0,)))
+    coefs = np.array(((1,),  (2.5,)))
+    return x @ coefs - 0.5
+
 # mse = sum(loss for (x, y) in train) / len(train) 
 lr = 0.001
-theta_val = np.zeros((input_size + 1, 1))
 
-
-theta_update = theta - loss.differentiate(theta) * lr
-# print(m_update)
-# class np_wrapper(np.ndarray):
-#    def differentiate(var: F):
-#       ...
-#    def gradients(a: np.ndarray):
-#       returns np.ndarray with same size as input with every element being
-#       B[i,j,...] = self.differentiate(a[i,j,...])
-#       B[a.shape + self.shape]
-#     @contextmanager
-#     def set_context(ctx):
-#         ...
-#     def update_value(key):
-#         ...
+theta_update = theta - gradients(loss, theta) * lr
+theta_val = make_value(theta)
 
 for epoch in range(100):
-    # x.value = ex
-    # y.value = exy
-    labels = np.random.random((100, 2)) * 10
+    labels = np.random.random((batch_size * 10, input_size))
     targets = f(labels)
     for i in range(0, len(labels), len(labels) // batch_size):
+        if labels[i:i+batch_size].shape[0] != batch_size:continue
         ctx = {
-            ctx_from_numpy(targets[i:i+batch_size]),
-            ctx_from_numpy(targets[i:i+batch_size]),
-            ctx_from_numpy(theta)
+            **ctx_from_array(xs[:,1:], labels[i:i+batch_size]),
+            **ctx_from_array(ys, targets[i:i+batch_size]),
+            **ctx_from_array(theta, theta_val)
         }
-        ctx.update({theta:theta_val})
         with loss.set_context(ctx):
-            theta_val = theta_update.compute()
+            theta_val = compute(theta_update)
             if not i:print("loss", loss.compute())
-print(m.value, b.value)
+print(theta_val)
