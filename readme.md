@@ -30,4 +30,5 @@ Python project implementing computational graph and differentiation on graph
 - [ ] Name the project
 - [ ] Tests
 - [ ] Differentiation
-- [ ] Graph simplification
+- [ ] update readme
+- [ ] numpy dependency
