@@ -11,7 +11,7 @@ from contextlib import contextmanager
 # ex if a > b then foo -> step(a - b) * foo
 
 def set_args(func):
-    """ Decorator for init method, set self._args with *args before calling init """
+    """ Decorator for __init method, set self._args with *args before calling init """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         self._args = args
@@ -23,7 +23,7 @@ def no_numpy(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if any(isinstance(e, np.ndarray) for e in args):
-            return NotImplemented
+            return NotImplementedError()
         return func(*args, **kwargs)
     return wrapper
 

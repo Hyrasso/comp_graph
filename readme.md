@@ -3,26 +3,30 @@
 Python project implementing computational graph and differentiation on graph
 
 ```python
+    from src import *
+
     x = Var("x")
     y = Var("y")
     a = Const(2)
-    
+
     z = x ** 2 + y * a
     print(z)
     # ((x ^ 2) + (y * 2))
     z = z / 2
     print(repr(z))
     # Div(Add(Pow(x, 2), Mul(y, 2)), 2)
-    print(z.compute({x: 2, y: 3}))
-
+    with z.set_context({x: 2, y: 3}):
+        print(z.compute())
     # 5.0
-    
+
     dzdx = z.differentiate(x)
     print(dzdx)
     # (((1 / 2) * ((1 * (((2 * (x ^ (2 - 1))) * 1) + (((x ^ 2) * Log(2)) * 0))) + (1 * ((2 * 0) + (y * 0))))) + ((-((x ^ 2) + (y * 2))) / (2 ^ 2)) * 0))
-    print(dzdx.compute())
+    with dzdx.set_context({x:2, y:3}):
+        print(dzdx.compute())
     # 2.0
-    print(z.differentiate(y).compute({x:2, y:1}))
+    with z.set_context({x:2, y:1}):
+        print(z.differentiate(y).compute())
     # 1.0
 ```
 
@@ -32,3 +36,6 @@ Python project implementing computational graph and differentiation on graph
 - [ ] Differentiation
 - [ ] update readme
 - [ ] numpy dependency
+
+Should the graph building part and graph evaluation be separated?
+-> Have a classes to overload operations (eg Add for +) and an evaluator that is not recursive, takes a graph as input and does all the computation. Could also freeze graph in some way to allow for faster repeated evaluation (measure what are the slow parts of the current implementation before trying ot optimize).

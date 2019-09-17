@@ -1,35 +1,24 @@
 from src import *
-
 x = Var("x")
 y = Var("y")
 a = Const(2)
 
 z = x ** 2 + y * a
-print(repr(z))
-# Add(Variable(x), Mul(Variable(y), Constant(2)))
-z = z / 2
 print(z)
-# Div(Add(Variable(x), Mul(Variable(y), Constant(2))), Constant(2))
-print(z.compute({x: 2, y: 3}))
-# 4.0
+# ((x ^ 2) + (y * 2))
+z = z / 2
+print(repr(z))
+# Div(Add(Pow(x, 2), Mul(y, 2)), 2)
+with z.set_context({x: 2, y: 3}):
+    print(z.compute())
+# 5.0
 
 dzdx = z.differentiate(x)
 print(dzdx)
-print(dzdx.compute())
-print(z.differentiate(y).compute({x:2, y:1}))
-
-# z = x * a - x * a / y + x ** x
-# ctx = {x:1, y:2}
-# z.set_context(ctx)
-# print(z.compute())
-# ctx[x] = 2
-# print(z.compute())
-# # Here differentiate should be a + 1 + y but only a + y is found, see differentiate method
-# dx = z.differentiate(x)
-# print(dx)
-# print(dx.compute())
-# # add reduce class
-# dzdy = z.differentiate(y)
-# print(dzdy)
-# print(dzdy.compute())
-
+# (((1 / 2) * ((1 * (((2 * (x ^ (2 - 1))) * 1) + (((x ^ 2) * Log(2)) * 0))) + (1 * ((2 * 0) + (y * 0))))) + ((-((x ^ 2) + (y * 2))) / (2 ^ 2)) * 0))
+with dzdx.set_context({x:2, y:3}):
+    print(dzdx.compute())
+# 2.0
+with z.set_context({x:2, y:1}):
+    print(z.differentiate(y).compute())
+# 1.0

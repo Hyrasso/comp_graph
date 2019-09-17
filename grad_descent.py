@@ -25,10 +25,7 @@ ys = np.array([Var(f"Y{i}") for i in range(batch_size)]).reshape((batch_size, 1)
 # stochastic gradien descent with batch
 def get_model(x):
     return x @ theta
-# how to implement batch ?
-# probably matmul is solution
-# loss = sum(model({x:xi}) - target) ** 2) for xi in batch
-# -> implement matmul, vector (1d tensor), and others, like ?sum
+
 model = xs @ theta
 
 loss = np.sum((model - ys) ** 2)
