@@ -1,4 +1,4 @@
-# Computational graph
+# Differentiation of computational graph
 
 Python project implementing computational graph and differentiation on graph
 
@@ -31,11 +31,12 @@ Python project implementing computational graph and differentiation on graph
 ```
 
 ## TODO List
-- [ ] Name the project
+- [x] Name the project
 - [ ] Tests
-- [ ] Differentiation
-- [ ] update readme
-- [ ] numpy dependency
+- [x] Differentiation
+- [x] update readme
+- [x] numpy dependency
 
+## To consider 
 Should the graph building part and graph evaluation be separated?
--> Have a classes to overload operations (eg Add for +) and an evaluator that is not recursive, takes a graph as input and does all the computation. Could also freeze graph in some way to allow for faster repeated evaluation (measure what are the slow parts of the current implementation before trying ot optimize).
+-> Have a classes to overload operations (eg Add for +) and an evaluator that is not recursive, takes a graph as input and does all the computation, or generates a function to evaluate (ex: string evaluated by numpy). 

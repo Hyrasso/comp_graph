@@ -1,5 +1,5 @@
 from src import *
-from src.np_functions import *
+from src.tensor import *
 from random import shuffle
 import numpy as np
 from functools import reduce
@@ -17,16 +17,16 @@ input_size = 2
 
 batch_size = 20
 
-theta = np.array([Var(f"t{i}") for i in range(input_size + 1)]).reshape((input_size + 1, 1))
+theta = Tensor([Var(f"t{i}") for i in range(input_size + 1)]).reshape((input_size + 1, 1))
 
-xs = np.array(list([Const(1), Var(f"X{i} 1"), Var(f"X{i} 0")] for i in range(batch_size)))
-ys = np.array([Var(f"Y{i}") for i in range(batch_size)]).reshape((batch_size, 1))
+xs = Tensor(list([Const(1), Var(f"X{i} 1"), Var(f"X{i} 0")] for i in range(batch_size)))
+ys = Tensor([Var(f"Y{i}") for i in range(batch_size)]).reshape((batch_size, 1))
 
 # stochastic gradien descent with batch
 def get_model(x):
-    return x @ theta
+    return np.dot(x, theta)
 
-model = xs @ theta
+model = get_model(xs)
 
 loss = np.sum((model - ys) ** 2)
 
