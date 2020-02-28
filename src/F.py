@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Tuple, Callable
+from typing import Any, Tuple, Callable, Type, Dict
 import abc
 from functools import wraps
 import numpy as np
@@ -11,15 +11,15 @@ from contextlib import contextmanager
 # ex if a > b then foo -> step(a - b) * foo
 
 def set_args(func):
-    """ Decorator for __init method, set self._args with *args before calling init """
+    """ Decorator for __init method, set self.args with *args before calling init """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        self._args = args
+        self.args = args
         return func(self, *args, **kwargs)
     return wrapper
 
 def no_numpy(func):
-    """ Raise TypeError if any argument is a numpy array """
+    """ Raise NotImplementedError if any argument is a numpy array """
     @wraps(func)
     def wrapper(*args, **kwargs):
         if any(isinstance(e, np.ndarray) for e in args):
@@ -36,7 +36,7 @@ class F(abc.ABC):
     # global attr (bad)
     context: ChainMap = ChainMap()
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         if hasattr(cls, "__init__"):
 
             init = getattr(cls, "__init__")
@@ -44,17 +44,21 @@ class F(abc.ABC):
         return super().__init_subclass__()
 
     # TODO: decorate instead of override, calling super.init from subclass for args unknown by the parent doesnt make much sense
-    def __init__(self, *args, **kwargs):
-        self._args = args
+    def __init__(self, *args, **kwargs) -> None:
+        self.args = args
 
     @abc.abstractmethod
     def compute(self) -> Any:
         ...
+    
+    @abc.abstractmethod
+    def grad(self) -> Any:
+        ...
 
     @staticmethod
-    def overload_numeric(method_name: str) -> F:
+    def overload_numeric(method_name: str) -> Callable[[Type[F]], Type[F]]:
         """ Add methods from class to F, used to overload __operations """
-        def decorator(cls: F) -> F:
+        def decorator(cls: Type[F]) -> Type[F]:
             method = getattr(cls, method_name)
             method = no_numpy(method)
             setattr(F, method_name, method)
@@ -67,8 +71,9 @@ class F(abc.ABC):
         # z = f + g
         # f can be const, variable, functions of anything
         # dz/dx = dz/df * df/dx + dz/dg * dg/dx
+        if var is None:var = self
         res = None
-        for arg, darg in zip(self._args, self.grad()):
+        for arg, darg in zip(self.args, self.grad()):
             # recursive fonction, skip for now because of how Var is defined
             if self == arg:
                 continue
@@ -85,25 +90,28 @@ class F(abc.ABC):
         return res
 
     def __repr__(self) -> str:
-        return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self._args)))
+        return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self.args)))
     
     @contextmanager
-    def set_context(self, ctx):
+    def set_context(self, ctx: Dict=None):
+        if ctx is None:
+            ctx = {}
         F.context = F.context.new_child(ctx)
         yield
         F.context = F.context.parents
 
     def __eq__(self, value):
         if isinstance(value, F):
-            return (type(self), self._args) == (type(value), value._args)
+            return (type(self), self.args) == (type(value), value.args)
         return super().__eq__(value)
 
     def __hash__(self):
         return super().__hash__()
 
-    def __call__(self, ctx) -> F:
+    def __call__(self, ctx: Dict=None) -> F:
         """Replace all var in ctx with their value given, leave the other unchanged return F"""
-        self.set_var_val()
+        with self.set_context(ctx):
+            return self.compute()
 
 class Const(F):
     def __init__(self, a: Any):
@@ -112,7 +120,7 @@ class Const(F):
     def compute(self) -> Any:
         return self.a
 
-    def grad(self) -> Tuple[int]:
+    def grad(self) -> Tuple[Const,]:
         return (Const(0),)
     
     def differentiate(self, var: F) -> F:

@@ -12,6 +12,7 @@ print(repr(z))
 with z.set_context({x: 2, y: 3}):
     print(z.compute())
 # 5.0
+print(z({x: 2, y: 3}))
 
 dzdx = z.differentiate(x)
 print(dzdx)
