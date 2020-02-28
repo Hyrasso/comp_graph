@@ -52,6 +52,5 @@ for i in range(100):
     for labels, targets in [(e/100, f(e/100)) for e in range(i, i+100)]:
         with loss.set_context({x:labels, y:targets}):
             opt.step()
-            with loss.set_context({opt.parameters: opt.theta}):
-                ll = loss.compute()
+            ll = loss({opt.parameters: opt.theta})
     print(i, opt.theta, ll)

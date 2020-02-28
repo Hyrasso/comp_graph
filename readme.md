@@ -18,7 +18,8 @@ Python project implementing computational graph and differentiation on graph
     with z.set_context({x: 2, y: 3}):
         print(z.compute())
     # 5.0
-
+    print(z({x: 2, y: 3}))
+    # 5.0
     dzdx = z.differentiate(x)
     print(dzdx)
     # (((1 / 2) * ((1 * (((2 * (x ^ (2 - 1))) * 1) + (((x ^ 2) * Log(2)) * 0))) + (1 * ((2 * 0) + (y * 0))))) + ((-((x ^ 2) + (y * 2))) / (2 ^ 2)) * 0))
