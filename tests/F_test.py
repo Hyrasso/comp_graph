@@ -8,6 +8,9 @@ class TestF(F):
         return ()
 
 class Test_F_base_class(unittest.TestCase):
+    def test_fail(self):
+        self.assertEqual(0, 1)
+
     def test_abstract(self):
         with self.assertRaises(TypeError):
             f = F()
