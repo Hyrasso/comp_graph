@@ -9,7 +9,7 @@ class GradientDescent(MinOptimizer):
         self.parameters = parameters
         self.theta = initial_value
 
-        self.update_parameters = parameters - lr * gradients(func, parameters) 
+        self.update_parameters = parameters - lr * func.differentiate(parameters) 
         self.lr = 0.001
 
     def step(self):

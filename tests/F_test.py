@@ -74,10 +74,31 @@ class Test_F_Const(unittest.TestCase):
         c2 = Const(0)
         self.assertNotEqual(c1.__hash__(), c2.__hash__())
 
+    def test_set_context(self):
+        o = object()
+        c1 = Const(o)
+        ctx = {o:1}
+        with c1.set_context(ctx):
+            self.assertEqual(F.context, ctx)
+            self.assertEqual(c1.compute(), o)
+        with c1.set_context():
+            self.assertEqual(F.context, {})
+        o1, o2 = object(), object()
+        with c1.set_context({o1:0}):
+            self.assertEqual(F.context, {o1:0})
+            with c1.set_context({o2:2}):
+                self.assertEqual(F.context, {o1:0, o2:2})
+                self.assertEqual(c1.compute(), o)
+
+
     def test_call(self):
         obj = object()
         c = Const(obj)
         self.assertEqual(c(), obj)
+        
+        a, b = 1, 2
+        f = Const(a) + Const(b)
+        self.assertEqual(f(), a + b, "depends on _add__ being implemented for const")
 
 class Test_Const(unittest.TestCase):
     def test_init(self):

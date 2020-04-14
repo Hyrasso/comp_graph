@@ -30,10 +30,10 @@ def no_numpy(func):
 class F(abc.ABC):
     """Basic block of the computational graph"""
 
-    # type annotation, should be set for each instance
+    # must be set for each instance
     args: Tuple[Any, ...]
 
-    # global attr (bad)
+    # global attr (bad?)
     context: ChainMap = ChainMap()
 
     def __init_subclass__(cls) -> None:
@@ -43,7 +43,6 @@ class F(abc.ABC):
             setattr(cls, "__init__", set_args(init))
         return super().__init_subclass__()
 
-    # TODO: decorate instead of override, calling super.init from subclass for args unknown by the parent doesnt make much sense
     def __init__(self, *args, **kwargs) -> None:
         self.args = args
 
@@ -74,7 +73,7 @@ class F(abc.ABC):
         if var is None:var = self
         res = None
         for arg, darg in zip(self.args, self.grad()):
-            # recursive fonction, skip for now because of how Var is defined
+            # recursive fonction, skip because of how Var is defined
             if self == arg:
                 continue
             dz_df = darg
@@ -83,8 +82,6 @@ class F(abc.ABC):
                 res = res + dz_df * df_dvar
             else:
                 res = dz_df * df_dvar
-        # print ("derivate", self, "with relate to", var)
-        # print("res", res)
         if res is None:
             return Const(0)
         return res
@@ -109,16 +106,22 @@ class F(abc.ABC):
         return super().__hash__()
 
     def __call__(self, ctx: Dict=None) -> F:
-        """Replace all var in ctx with their value given, leave the other unchanged return F"""
+        """Returns self.compute() with ctx as context  
+            r = f({f:1})
+            # is equivalent to
+            with f.set_context({f:1}):
+                tmp = f.compute()
+            r = tmp
+        """
         with self.set_context(ctx):
             return self.compute()
 
 class Const(F):
-    def __init__(self, a: Any):
-        self.a = a
+    def __init__(self, value: Any):
+        self.value = value
 
     def compute(self) -> Any:
-        return self.a
+        return self.value
 
     def grad(self) -> Tuple[Const,]:
         return (Const(0),)
@@ -127,4 +130,4 @@ class Const(F):
         return Const(0)
 
     def __repr__(self) -> str:
-        return repr(self.a)
+        return repr(self.value)
