@@ -1,6 +1,21 @@
+from typing import Any
 from .node import Node
 from src.variable import Const
 import math
+
+@Node.overload_numeric("exp")
+class Exp(Node):
+    def __init__(self, a: Node):
+        self.a = a
+
+    def compute(self):
+        return math.exp(self.a.compute())
+    
+    def grad(self):
+        return self
+
+    def exp(self):
+        return Exp(self)
 
 class Log(Node):
     def __init__(self, a: Node):

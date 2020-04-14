@@ -1,5 +1,3 @@
-from src.np_functions import gradients
-
 class MinOptimizer:
     pass
 

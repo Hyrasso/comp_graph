@@ -44,7 +44,7 @@ class Node(abc.ABC):
 
     @staticmethod
     def overload_numeric(method_name: str) -> Callable[[Type[Node]], Type[Node]]:
-        """ Add methods from class to Node, used to overload dunder operations methods """
+        """ Add methods from class to Node, used to overload dunder operations methods and some numpy functions"""
         def decorator(cls: Type[Node]) -> Type[Node]:
             method = getattr(cls, method_name)
             setattr(Node, method_name, method)
@@ -60,17 +60,13 @@ class Node(abc.ABC):
         if var is None:var = self
         res = None
         for arg, darg in zip(self.args, self.grad()):
-            # recursive fonction, skip because of how Var is defined
-            # if self == arg:
-            #     continue
             dz_df = darg
             df_dvar = arg.differentiate(var)
             if res is not None:
                 res = res + dz_df * df_dvar
             else:
                 res = dz_df * df_dvar
-        if res is None:
-            return Const(0)
+        assert res is not None, "Happen if some Node takes no argument, not sure when useful"
         return res
 
     def __repr__(self) -> str:

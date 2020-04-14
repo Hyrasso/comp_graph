@@ -118,6 +118,7 @@ class Div(Node):
 
 
 @Node.overload_numeric("__pow__")
+@Node.overload_numeric("__rpow__")
 class Pow(Node):
     def __init__(self, a: Node, b: Node):
         super().__init__(a, b)
@@ -137,6 +138,11 @@ class Pow(Node):
         if not isinstance(o, Node):
             o = Const(o)
         return Pow(self, o)
+
+    def __rpow__(self, o):
+        if not isinstance(o, Node):
+            o = Const(o)
+        return Pow(o, self)
 
 # matmul is not implemented for usual python types
 # @Node.overload_numeric("__matmul__")

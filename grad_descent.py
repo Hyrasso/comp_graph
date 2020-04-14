@@ -15,16 +15,19 @@ from functools import reduce
 input_size = 2
 # function to model R2 -> R
 
-batch_size = 20
+batch_size = 64
 
-theta = Tensor([Var(f"t{i}") for i in range(input_size + 1)]).reshape((input_size + 1, 1))
+theta = var(input_size).reshape((input_size, 1))
+set_value(theta, np.random.random(theta.shape) * 2 - 1)
+beta = var(1).reshape((1,))
+set_value(beta, np.random.random((beta.shape)) * 2 - 1)
 
-xs = Tensor(list([Const(1), Var(f"X{i} 1"), Var(f"X{i} 0")] for i in range(batch_size)))
-ys = Tensor([Var(f"Y{i}") for i in range(batch_size)]).reshape((batch_size, 1))
-
+xs = var((batch_size, 2))
+ys = var(batch_size).reshape((batch_size, 1))
+print(xs)
 # stochastic gradien descent with batch
 def get_model(x):
-    return np.dot(x, theta)
+    return x.dot(theta) + beta
 
 model = get_model(xs)
 
@@ -38,19 +41,14 @@ def f(x):
 lr = 0.001
 
 theta_update = theta - gradients(loss, theta) * lr
-theta_val = make_value(theta)
 
-for epoch in range(100):
+for epoch in range(20):
     labels = np.random.random((batch_size * 10, input_size))
     targets = f(labels)
     for i in range(0, len(labels), len(labels) // batch_size):
         if labels[i:i+batch_size].shape[0] != batch_size:continue
-        ctx = {
-            **ctx_from_array(xs[:,1:], labels[i:i+batch_size]),
-            **ctx_from_array(ys, targets[i:i+batch_size]),
-            **ctx_from_array(theta, theta_val)
-        }
-        with loss.set_context(ctx):
-            theta_val = compute(theta_update)
-            if not i:print("loss", loss.compute())
-print(theta_val)
+        set_value(xs, labels[i:i+batch_size])
+        set_value(ys, targets[i:i+batch_size])
+        set_value(theta, compute(theta_update))
+        if not i:print("loss", compute(loss))
+print(compute(theta))
