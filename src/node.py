@@ -18,23 +18,11 @@ def set_args(func):
         return func(self, *args, **kwargs)
     return wrapper
 
-def no_numpy(func):
-    """ Raise NotImplementedError if any argument is a numpy array """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if any(isinstance(e, np.ndarray) for e in args):
-            return NotImplementedError()
-        return func(*args, **kwargs)
-    return wrapper
-
-class F(abc.ABC):
+class Node(abc.ABC):
     """Basic block of the computational graph"""
 
     # must be set for each instance
-    args: Tuple[Any, ...]
-
-    # global attr (bad?)
-    context: ChainMap = ChainMap()
+    args: Tuple[Node, ...]
 
     def __init_subclass__(cls) -> None:
         if hasattr(cls, "__init__"):
@@ -55,16 +43,15 @@ class F(abc.ABC):
         ...
 
     @staticmethod
-    def overload_numeric(method_name: str) -> Callable[[Type[F]], Type[F]]:
-        """ Add methods from class to F, used to overload __operations """
-        def decorator(cls: Type[F]) -> Type[F]:
+    def overload_numeric(method_name: str) -> Callable[[Type[Node]], Type[Node]]:
+        """ Add methods from class to Node, used to overload dunder operations methods """
+        def decorator(cls: Type[Node]) -> Type[Node]:
             method = getattr(cls, method_name)
-            method = no_numpy(method)
-            setattr(F, method_name, method)
+            setattr(Node, method_name, method)
             return cls
         return decorator
 
-    def differentiate(self, var: F) -> F:
+    def differentiate(self, var: Node) -> Node:
         """ Define partial derivative relative to var """
         # chain rule for multi variable
         # z = f + g
@@ -74,8 +61,8 @@ class F(abc.ABC):
         res = None
         for arg, darg in zip(self.args, self.grad()):
             # recursive fonction, skip because of how Var is defined
-            if self == arg:
-                continue
+            # if self == arg:
+            #     continue
             dz_df = darg
             df_dvar = arg.differentiate(var)
             if res is not None:
@@ -91,21 +78,23 @@ class F(abc.ABC):
     
     @contextmanager
     def set_context(self, ctx: Dict=None):
-        if ctx is None:
-            ctx = {}
-        F.context = F.context.new_child(ctx)
+        if ctx is None:ctx = {}
+        for var, value in ctx.items():
+            ctx[var] = var.value
+            var.value = value
         yield
-        F.context = F.context.parents
+        for var, value in ctx.items():
+            var.value = value
 
     def __eq__(self, value):
-        if isinstance(value, F):
+        if isinstance(value, Node):
             return (type(self), self.args) == (type(value), value.args)
         return super().__eq__(value)
 
     def __hash__(self):
         return super().__hash__()
 
-    def __call__(self, ctx: Dict=None) -> F:
+    def __call__(self, ctx: Dict=None) -> Node:
         """Returns self.compute() with ctx as context  
             r = f({f:1})
             # is equivalent to
@@ -115,19 +104,3 @@ class F(abc.ABC):
         """
         with self.set_context(ctx):
             return self.compute()
-
-class Const(F):
-    def __init__(self, value: Any):
-        self.value = value
-
-    def compute(self) -> Any:
-        return self.value
-
-    def grad(self) -> Tuple[Const,]:
-        return (Const(0),)
-    
-    def differentiate(self, var: F) -> F:
-        return Const(0)
-
-    def __repr__(self) -> str:
-        return repr(self.value)

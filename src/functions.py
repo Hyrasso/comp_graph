@@ -1,8 +1,9 @@
-from .F import F, Const
+from .node import Node
+from src.variable import Const
 import math
 
-class Log(F):
-    def __init__(self, a: F):
+class Log(Node):
+    def __init__(self, a: Node):
         self.a = a
 
     def compute(self):
@@ -11,14 +12,14 @@ class Log(F):
     def grad(self):
         return 1 / self.a
 
-class Dirac(F):
+class Dirac(Node):
     def compute(self):
         return 1 if self.args[0].compute() == 0 else 0
     
     def grad(self):
         return (Const(0),) # almost but actually not
 
-class Step(F):
+class Step(Node):
     def compute(self):
         return 1 if self.args[0].compute() >= 0 else 0
     

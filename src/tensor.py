@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Union, Any
 import numpy as np
-from src.F import F
+from src.Node import Node
 
 # The idea here is to wrap nparray 
 # and wrap returns that are ndarray in Tensor 
@@ -31,12 +31,12 @@ class Tensor:
     def differentiate(self, other):
         def diff(e):
             return e.differentiate(other)
-        if isinstance(other, F):
+        if isinstance(other, Node):
             return Tensor.__transmute(np.vectorize(diff)(self._nparray))
 
         if isinstance(other, Tensor):
             return Tensor.gradients(self, other)
-        return TypeError(f"Argument should be of type F or Tensor, not {type(other)}")
+        return TypeError(f"Argument should be of type Node or Tensor, not {type(other)}")
 
     @staticmethod
     def gradients(func, params):
@@ -53,7 +53,7 @@ def ctx_from_array(parameters: np.ndarray, values: np.ndarray):
 def make_value(array: np.ndarray, value=0):
     return np.zeros(array.shape) + value
 
-def gradients(func: F, params: np.ndarray):
+def gradients(func: Node, params: np.ndarray):
     g = [func.differentiate(e) for e in params.flat]
     return np.array(g).reshape(params.shape)
 
